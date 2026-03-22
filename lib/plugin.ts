@@ -7,6 +7,7 @@ import {handleGetDeviceInfo, handleListDevices} from './http/device-route'
 import {handleExecuteCommand} from './http/command-route'
 
 export class SolunaExtPlugin extends BasePlugin {
+  // noinspection JSUnusedGlobalSymbols
   static async updateServer(
     expressApp: Application,
     _httpServer: AppiumServer
@@ -28,4 +29,5 @@ export class SolunaExtPlugin extends BasePlugin {
   }
 }
 
+// noinspection JSUnusedGlobalSymbols
 export default SolunaExtPlugin

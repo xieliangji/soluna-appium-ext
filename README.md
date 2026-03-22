@@ -68,6 +68,11 @@ English documentation is available in [`README.en.md`](./README.en.md).
 - `truncated`：输出是否被截断
 - `stdout` / `stderr`：采集到的输出
 
+日志行为：
+
+- 请求与执行结果摘要输出到 Appium `info` 级别日志
+- 完整 `stdout` / `stderr` 输出到 `debug` 级别日志
+
 对于不会立即退出、会持续输出的命令（例如某些日志类命令），本插件不会无限等待：
 
 - 在 `timeoutMs` 窗口内持续采集输出

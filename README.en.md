@@ -66,6 +66,11 @@ Response includes:
 - `truncated`: whether output was truncated
 - `stdout` / `stderr`: captured output
 
+Logging behavior:
+
+- Request/result summaries are logged at Appium `info` level
+- Full command `stdout` / `stderr` are logged at `debug` level
+
 For long-running commands that keep streaming output, this plugin uses controlled execution:
 
 - captures output within `timeoutMs`
