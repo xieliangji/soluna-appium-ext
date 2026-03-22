@@ -28,12 +28,14 @@ English documentation is available in [`README.en.md`](./README.en.md).
 插件暴露接口：
 
 - `GET /soluna/device?udid=<UDID>`
+- `GET /soluna/devices`
 
 行为：
 
 - 根据 `udid` 判断当前机器连接的是 Android 设备还是 iOS 设备
 - 按统一结构返回设备信息
 - 设备不存在时返回 404
+- `GET /soluna/devices` 返回当前接入主机的全部 Android+iOS 设备
 
 ### 3）执行 adb / go-ios（ios）命令
 
@@ -212,7 +214,13 @@ Appium 启动后，可通过 `curl` 验证：
 curl "http://127.0.0.1:4723/soluna/device?udid=<YOUR_UDID>"
 ```
 
-### 5）调用命令执行接口
+### 5）调用全部设备列表接口
+
+```bash
+curl "http://127.0.0.1:4723/soluna/devices"
+```
+
+### 6）调用命令执行接口
 
 ```bash
 curl -X POST "http://127.0.0.1:4723/soluna/command" \
@@ -220,13 +228,14 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
   -d '{"tool":"adb","args":["devices"],"timeoutMs":5000}'
 ```
 
-### 6）可选：自定义 Appium 地址与端口
+### 7）可选：自定义 Appium 地址与端口
 
 如果你不是用默认 `127.0.0.1:4723`，请同步修改请求地址：
 
 ```bash
 appium --address 0.0.0.0 --port 4725 --use-plugins=soluna-ext
 curl "http://127.0.0.1:4725/soluna/device?udid=<YOUR_UDID>"
+curl "http://127.0.0.1:4725/soluna/devices"
 ```
 
 ## 开发说明

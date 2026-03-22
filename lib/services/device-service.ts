@@ -1,7 +1,9 @@
 import {runCommand, type CommandRunner} from '../cli/exec'
 import {findAndroidDeviceByUdid} from './android'
 import {findIosDeviceByUdid} from './ios'
-import type {DeviceLookupResult} from '../types/device'
+import {listAndroidDevices} from './android'
+import {listIosDevices} from './ios'
+import type {DeviceLookupResult, UnifiedDeviceInfo} from '../types/device'
 
 export async function lookupDeviceByUdid(
   udid: string,
@@ -18,4 +20,15 @@ export async function lookupDeviceByUdid(
   }
 
   return {found: false}
+}
+
+export async function listConnectedDevices(
+  runner: CommandRunner = runCommand
+): Promise<UnifiedDeviceInfo[]> {
+  const [androidDevices, iosDevices] = await Promise.all([
+    listAndroidDevices(runner),
+    listIosDevices(runner),
+  ])
+
+  return [...androidDevices, ...iosDevices]
 }

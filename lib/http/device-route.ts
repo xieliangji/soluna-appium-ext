@@ -1,5 +1,5 @@
 import type {Request, Response} from 'express'
-import {lookupDeviceByUdid} from '../services/device-service'
+import {listConnectedDevices, lookupDeviceByUdid} from '../services/device-service'
 import type {CommandRunner} from '../cli/exec'
 
 export async function handleGetDeviceInfo(
@@ -33,6 +33,21 @@ export async function handleGetDeviceInfo(
     value: {
       exists: true,
       device: result.device,
+    },
+  })
+}
+
+export async function handleListDevices(
+  _req: Request,
+  res: Response,
+  runner?: CommandRunner
+): Promise<void> {
+  void _req
+  const devices = await listConnectedDevices(runner)
+  res.status(200).json({
+    value: {
+      count: devices.length,
+      devices,
     },
   })
 }

@@ -26,12 +26,14 @@ If any required command is missing, it logs an error and throws, blocking Appium
 The plugin exposes:
 
 - `GET /soluna/device?udid=<UDID>`
+- `GET /soluna/devices`
 
 Behavior:
 
 - Detects whether the UDID belongs to an Android or iOS device connected to the host
 - Returns normalized device info
 - Returns HTTP 404 when device does not exist
+- `GET /soluna/devices` returns all currently connected Android+iOS devices
 
 ### 3) Execute adb / go-ios (ios) commands
 
@@ -173,7 +175,13 @@ appium --use-plugins=soluna-ext
 curl "http://127.0.0.1:4723/soluna/device?udid=<YOUR_UDID>"
 ```
 
-### 5) Call the command execution endpoint
+### 5) Call the all-devices endpoint
+
+```bash
+curl "http://127.0.0.1:4723/soluna/devices"
+```
+
+### 6) Call the command execution endpoint
 
 ```bash
 curl -X POST "http://127.0.0.1:4723/soluna/command" \
@@ -181,11 +189,12 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
   -d '{"tool":"adb","args":["devices"],"timeoutMs":5000}'
 ```
 
-### 6) Optional custom host/port
+### 7) Optional custom host/port
 
 ```bash
 appium --address 0.0.0.0 --port 4725 --use-plugins=soluna-ext
 curl "http://127.0.0.1:4725/soluna/device?udid=<YOUR_UDID>"
+curl "http://127.0.0.1:4725/soluna/devices"
 ```
 
 ## Development

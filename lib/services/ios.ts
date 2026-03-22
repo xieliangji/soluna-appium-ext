@@ -21,13 +21,20 @@ function parseGoIosListOutput(output: string): GoIosListResponse {
   }
 }
 
-export async function findIosDeviceByUdid(
-  udid: string,
-  runner: CommandRunner = runCommand
-): Promise<UnifiedDeviceInfo | null> {
+function toUnifiedIosDeviceInfo(device: GoIosDeviceDetails): UnifiedDeviceInfo {
+  return {
+    platform: 'ios',
+    udid: device.udid,
+    name: device.ProductName || 'iOS Device',
+    model: device.ProductType || 'Unknown',
+    osVersion: device.ProductVersion || 'Unknown',
+  }
+}
+
+async function fetchGoIosDeviceList(runner: CommandRunner): Promise<GoIosDeviceDetails[]> {
   const iosCmd = await resolveIosCommand(runner)
   if (!iosCmd) {
-    return null
+    return []
   }
 
   let detailsOutput: string
@@ -35,22 +42,29 @@ export async function findIosDeviceByUdid(
     const result = await runner(iosCmd, ['list', '--details'])
     detailsOutput = result.stdout
   } catch {
-    return null
+    return []
   }
 
   const parsed = parseGoIosListOutput(detailsOutput)
-  const candidate = parsed.deviceList?.find((item) => item.udid === udid)
+  return parsed.deviceList ?? []
+}
+
+export async function findIosDeviceByUdid(
+  udid: string,
+  runner: CommandRunner = runCommand
+): Promise<UnifiedDeviceInfo | null> {
+  const list = await fetchGoIosDeviceList(runner)
+  const candidate = list.find((item) => item.udid === udid)
   if (!candidate) {
     return null
   }
 
-  return {
-    platform: 'ios',
-    udid,
-    name: candidate.ProductName || 'iOS Device',
-    model: candidate.ProductType || 'Unknown',
-    osVersion: candidate.ProductVersion || 'Unknown',
-  }
+  return toUnifiedIosDeviceInfo(candidate)
+}
+
+export async function listIosDevices(runner: CommandRunner = runCommand): Promise<UnifiedDeviceInfo[]> {
+  const list = await fetchGoIosDeviceList(runner)
+  return list.map(toUnifiedIosDeviceInfo)
 }
 
 export const __internal = {

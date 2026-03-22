@@ -28,6 +28,25 @@ function parseAndroidProps(output: string): Record<string, string> {
   return props
 }
 
+function toUnifiedAndroidDeviceInfo(udid: string, props: Record<string, string>): UnifiedDeviceInfo {
+  return {
+    platform: 'android',
+    udid,
+    name: props['ro.product.model'] || props['ro.product.name'] || 'Android Device',
+    model: props['ro.product.model'] || 'Unknown',
+    osVersion: props['ro.build.version.release'] || 'Unknown',
+  }
+}
+
+async function fetchAndroidDeviceInfo(
+  udid: string,
+  runner: CommandRunner
+): Promise<UnifiedDeviceInfo> {
+  const propsOutput = await runner('adb', ['-s', udid, 'shell', 'getprop'])
+  const props = parseAndroidProps(propsOutput.stdout)
+  return toUnifiedAndroidDeviceInfo(udid, props)
+}
+
 export async function findAndroidDeviceByUdid(
   udid: string,
   runner: CommandRunner = runCommand
@@ -46,16 +65,36 @@ export async function findAndroidDeviceByUdid(
     return null
   }
 
-  const propsOutput = await runner('adb', ['-s', udid, 'shell', 'getprop'])
-  const props = parseAndroidProps(propsOutput.stdout)
+  return await fetchAndroidDeviceInfo(udid, runner)
+}
 
-  return {
-    platform: 'android',
-    udid,
-    name: props['ro.product.model'] || props['ro.product.name'] || 'Android Device',
-    model: props['ro.product.model'] || 'Unknown',
-    osVersion: props['ro.build.version.release'] || 'Unknown',
+export async function listAndroidDevices(
+  runner: CommandRunner = runCommand
+): Promise<UnifiedDeviceInfo[]> {
+  let listOutput: string
+  try {
+    const result = await runner('adb', ['devices'])
+    listOutput = result.stdout
+  } catch {
+    return []
   }
+
+  const connectedDevices = parseAdbDevices(listOutput).filter((item) => item.state === 'device')
+  return await Promise.all(
+    connectedDevices.map(async ({serial}) => {
+      try {
+        return await fetchAndroidDeviceInfo(serial, runner)
+      } catch {
+        return {
+          platform: 'android',
+          udid: serial,
+          name: 'Android Device',
+          model: 'Unknown',
+          osVersion: 'Unknown',
+        }
+      }
+    })
+  )
 }
 
 export const __internal = {

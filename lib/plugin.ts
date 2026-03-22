@@ -3,7 +3,7 @@ import express from 'express'
 import type {Application} from 'express'
 import type {AppiumServer} from '@appium/types'
 import {runPreflightChecks} from './cli/preflight'
-import {handleGetDeviceInfo} from './http/device-route'
+import {handleGetDeviceInfo, handleListDevices} from './http/device-route'
 import {handleExecuteCommand} from './http/command-route'
 
 export class SolunaExtPlugin extends BasePlugin {
@@ -16,6 +16,10 @@ export class SolunaExtPlugin extends BasePlugin {
 
     expressApp.get('/soluna/device', async (req, res) => {
       await handleGetDeviceInfo(req, res)
+    })
+
+    expressApp.get('/soluna/devices', async (req, res) => {
+      await handleListDevices(req, res)
     })
 
     expressApp.post('/soluna/command', express.json(), async (req, res) => {
