@@ -4,11 +4,11 @@ import {promisify} from 'node:util'
 const execFileAsync = promisify(execFile)
 
 export interface CommandResult {
-  stdout: string;
-  stderr: string;
+  stdout: string
+  stderr: string
 }
 
-export type CommandRunner = (command: string, args?: string[]) => Promise<CommandResult>;
+export type CommandRunner = (command: string, args?: string[]) => Promise<CommandResult>
 
 export const runCommand: CommandRunner = async (command, args = []) => {
   const {stdout, stderr} = await execFileAsync(command, args, {

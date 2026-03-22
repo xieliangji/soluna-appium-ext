@@ -2,8 +2,8 @@ import {runCommand, type CommandRunner} from '../cli/exec'
 import type {UnifiedDeviceInfo} from '../types/device'
 
 interface AdbDeviceRecord {
-  serial: string;
-  state: string;
+  serial: string
+  state: string
 }
 
 function parseAdbDevices(output: string): AdbDeviceRecord[] {
@@ -19,7 +19,7 @@ function parseAdbDevices(output: string): AdbDeviceRecord[] {
 function parseAndroidProps(output: string): Record<string, string> {
   const props: Record<string, string> = {}
   for (const line of output.split(/\r?\n/)) {
-    const match = line.match(/^\[([^\]]+)\]:\s*\[(.*)\]$/)
+    const match = line.match(/^\[([^\]]+)]:\s*\[(.*)]$/)
     if (!match) {
       continue
     }

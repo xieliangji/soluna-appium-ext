@@ -5,6 +5,11 @@
 - Appium startup preflight checks for host CLI dependencies (`adb` and `go-ios`/`ios`)
 - A custom HTTP endpoint to query device info by `udid` with a unified Android/iOS response model
 
+Preflight command discovery is cross-platform:
+
+- macOS/Linux: uses `which`
+- Windows: uses `where`
+
 ## Features
 
 ### 1) Preflight checks before Appium startup
@@ -112,7 +117,7 @@ Preflight failed: missing required CLI tool(s): adb, go-ios (or alias: ios). Ins
 If you run `appium` inside this plugin repository and the project depends on `appium`, Appium may mark the plugin as `dev` install type.
 In `dev` mode, uninstall is blocked with: `Cannot uninstall ... because it is in development`.
 
-#### A) `dev` mode (your current case)
+#### A) `dev` mode
 
 Upgrade flow:
 

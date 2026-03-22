@@ -5,6 +5,11 @@
 - 在 Appium 启动前检查宿主机依赖（`adb`、`go-ios`/`ios`）
 - 通过 HTTP 接口按 `udid` 查询设备，并以统一模型返回 Android/iOS 设备信息
 
+预检中的命令发现已做跨平台兼容：
+
+- macOS/Linux：使用 `which`
+- Windows：使用 `where`
+
 English documentation is available in [`README.en.md`](./README.en.md).
 
 ## 功能说明
@@ -149,7 +154,7 @@ Preflight failed: missing required CLI tool(s): adb, go-ios (or alias: ios). Ins
 如果你是在插件仓库内执行 `appium` 命令，并且当前项目依赖里包含 `appium`，Appium 会把该插件标记为 `dev` 模式。
 `dev` 模式下不允许 `uninstall`，会提示：`Cannot uninstall ... because it is in development`。
 
-#### A) `dev` 模式（你当前这种情况）
+#### A) `dev` 模式
 
 升级步骤：
 

@@ -3,9 +3,11 @@ import express from 'express'
 import request from 'supertest'
 import {handleGetDeviceInfo} from '../../lib/http/device-route'
 import type {CommandRunner} from '../../lib/cli/exec'
+import {getCommandLookupCommand} from '../../lib/cli/preflight'
 
 describe('GET /soluna/device', () => {
   const app = express()
+  const lookupCommand = getCommandLookupCommand()
 
   app.get('/soluna/device', async (req, res) => {
     const runner: CommandRunner = async (command: string, args: string[] = []) => {
@@ -25,10 +27,10 @@ describe('GET /soluna/device', () => {
           stderr: '',
         }
       }
-      if (command === 'which' && args[0] === 'adb') {
+      if (command === lookupCommand && args[0] === 'adb') {
         return {stdout: '/usr/bin/adb\n', stderr: ''}
       }
-      if (command === 'which' && (args[0] === 'go-ios' || args[0] === 'ios')) {
+      if (command === lookupCommand && (args[0] === 'go-ios' || args[0] === 'ios')) {
         throw new Error('not found')
       }
       throw new Error(`Unexpected command ${command} ${args.join(' ')}`)

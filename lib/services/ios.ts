@@ -3,14 +3,14 @@ import {resolveIosCommand} from '../cli/preflight'
 import type {UnifiedDeviceInfo} from '../types/device'
 
 interface GoIosDeviceDetails {
-  udid: string;
-  ProductName?: string;
-  ProductType?: string;
-  ProductVersion?: string;
+  udid: string
+  ProductName?: string
+  ProductType?: string
+  ProductVersion?: string
 }
 
 interface GoIosListResponse {
-  deviceList?: GoIosDeviceDetails[];
+  deviceList?: GoIosDeviceDetails[]
 }
 
 function parseGoIosListOutput(output: string): GoIosListResponse {

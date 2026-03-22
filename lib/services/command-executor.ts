@@ -10,21 +10,21 @@ const HARD_STOP_EXTRA_MS = 2000
 const ALLOWED_TOOLS = new Set<SupportedTool>(['adb', 'go-ios', 'ios'])
 
 interface CommandProcessEvents {
-  on(event: 'close', listener: (code: number | null) => void): this;
-  once(event: 'error', listener: (err: NodeJS.ErrnoException) => void): this;
+  on(event: 'close', listener: (code: number | null) => void): this
+  once(event: 'error', listener: (err: NodeJS.ErrnoException) => void): this
 }
 
 export interface SpawnedCommandProcess extends CommandProcessEvents {
-  stdout: NodeJS.ReadableStream | null;
-  stderr: NodeJS.ReadableStream | null;
-  kill(signal?: NodeJS.Signals): boolean;
+  stdout: NodeJS.ReadableStream | null
+  stderr: NodeJS.ReadableStream | null
+  kill(signal?: NodeJS.Signals): boolean
 }
 
-export type SpawnCommandProcess = (command: string, args: string[]) => SpawnedCommandProcess;
+export type SpawnCommandProcess = (command: string, args: string[]) => SpawnedCommandProcess
 
 export interface CommandExecutorOptions {
-  spawnProcess?: SpawnCommandProcess;
-  now?: () => number;
+  spawnProcess?: SpawnCommandProcess
+  now?: () => number
 }
 
 function defaultSpawnProcess(command: string, args: string[]): SpawnedCommandProcess {
