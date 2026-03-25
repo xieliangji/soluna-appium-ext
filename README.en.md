@@ -255,30 +255,77 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
   -d '{"tool":"adb","args":["devices"],"timeoutMs":5000}'
 ```
 
-### 6) Call log session APIs
+### 7) Log session APIs (curl commands)
 
-Create session:
+Prepare variables:
 
 ```bash
-curl -X POST "http://127.0.0.1:4723/soluna/logs/sessions" \
+APPIUM_URL="http://127.0.0.1:4723"
+UDID="<YOUR_UDID>"
+```
+
+1) Create a log session (with optional limits):
+
+```bash
+curl -sS -X POST "$APPIUM_URL/soluna/logs/sessions" \
   -H "Content-Type: application/json" \
-  -d '{"udid":"<YOUR_UDID>"}'
+  -d "{
+    \"udid\":\"$UDID\",
+    \"maxBufferEntries\":1000,
+    \"maxSessionBytes\":104857600,
+    \"ttlMs\":600000
+  }"
 ```
 
-Incremental pull:
+The response includes:
+
+- `value.session.sessionId`
+- `value.session.nextSeq`
+
+2) First pull (`cursor=0`):
 
 ```bash
-curl "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>?cursor=0&limit=200"
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=0&limit=200"
 ```
 
-Delete session:
+3) Incremental pull (reuse previous `nextCursor`):
 
 ```bash
-curl -X DELETE "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>"
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=<NEXT_CURSOR>&limit=200"
 ```
 
-### 7) Optional custom host/port
-### 7) Optional custom host/port
+4) Delete session:
+
+```bash
+curl -sS -X DELETE "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>"
+```
+
+#### High-volume logs / long pause: pull latest only
+
+Option A (keep current session):
+
+1) Use a very large cursor once to jump to the current tail:
+
+```bash
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=999999999&limit=1"
+```
+
+2) Read `value.nextCursor` from the response, then keep polling with it:
+
+```bash
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=<NEXT_CURSOR>&limit=200"
+```
+
+Option B (clean restart):
+
+- Delete the old session and create a new one. New session starts from “now”.
+
+Notes:
+
+- `cursorAdjusted=true`: your requested cursor was auto-adjusted by server
+- `droppedCount>0`: some historical logs were already evicted by retention/trimming
+
+### 8) Optional custom host/port
 
 ```bash
 appium --address 0.0.0.0 --port 4725 --use-plugins=soluna-ext
@@ -286,7 +333,7 @@ curl "http://127.0.0.1:4725/soluna/device?udid=<YOUR_UDID>"
 curl "http://127.0.0.1:4725/soluna/devices"
 ```
 
-### 8) Python client (under `test`)
+### 9) Python client (repository root)
 
 A lightweight Python client is provided at `soluna_client.py` in the repository root (stdlib only, no third-party deps).
 

@@ -294,30 +294,77 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
   -d '{"tool":"adb","args":["devices"],"timeoutMs":5000}'
 ```
 
-### 6）调用日志会话接口
+### 7）调用日志会话接口（curl 命令版）
 
-创建会话：
+先准备变量：
 
 ```bash
-curl -X POST "http://127.0.0.1:4723/soluna/logs/sessions" \
+APPIUM_URL="http://127.0.0.1:4723"
+UDID="<YOUR_UDID>"
+```
+
+1）创建日志会话（可带可选参数）：
+
+```bash
+curl -sS -X POST "$APPIUM_URL/soluna/logs/sessions" \
   -H "Content-Type: application/json" \
-  -d '{"udid":"<YOUR_UDID>"}'
+  -d "{
+    \"udid\":\"$UDID\",
+    \"maxBufferEntries\":1000,
+    \"maxSessionBytes\":104857600,
+    \"ttlMs\":600000
+  }"
 ```
 
-增量拉取：
+返回示例里会包含：
+
+- `value.session.sessionId`
+- `value.session.nextSeq`
+
+2）第一次拉取（从 `cursor=0` 开始）：
 
 ```bash
-curl "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>?cursor=0&limit=200"
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=0&limit=200"
 ```
 
-结束会话：
+3）增量拉取（使用上一次返回的 `nextCursor`）：
 
 ```bash
-curl -X DELETE "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>"
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=<NEXT_CURSOR>&limit=200"
 ```
 
-### 7）可选：自定义 Appium 地址与端口
-### 7）可选：自定义 Appium 地址与端口
+4）结束并清理会话：
+
+```bash
+curl -sS -X DELETE "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>"
+```
+
+#### 日志太多/长时间没拉：如何直接拉“最新”
+
+方案 A（保留当前会话）：
+
+1）先用一个很大的 cursor 触发“跳到当前最新位置”：
+
+```bash
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=999999999&limit=1"
+```
+
+2）从响应里拿 `value.nextCursor`，后续都用这个值增量拉取：
+
+```bash
+curl -sS "$APPIUM_URL/soluna/logs/sessions/<SESSION_ID>?cursor=<NEXT_CURSOR>&limit=200"
+```
+
+方案 B（重新开始）：
+
+- 直接 `DELETE` 旧会话并重新 `POST` 创建新会话，天然从“当前时刻”开始拉。
+
+提示：
+
+- `cursorAdjusted=true`：表示你的 cursor 已被服务端自动修正（通常是过旧或过大）
+- `droppedCount>0`：表示有历史日志已被淘汰（文件裁剪或保留策略导致）
+
+### 8）可选：自定义 Appium 地址与端口
 
 如果你不是用默认 `127.0.0.1:4723`，请同步修改请求地址：
 
@@ -327,7 +374,7 @@ curl "http://127.0.0.1:4725/soluna/device?udid=<YOUR_UDID>"
 curl "http://127.0.0.1:4725/soluna/devices"
 ```
 
-### 8）Python client（test 包）
+### 9）Python client（根目录）
 
 仓库内提供了一个轻量 Python client：`soluna_client.py`（仓库根目录，仅标准库，无第三方依赖）。
 

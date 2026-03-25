@@ -13,12 +13,74 @@ interface GoIosListResponse {
   deviceList?: GoIosDeviceDetails[]
 }
 
+type RawRecord = Record<string, unknown>
+
+function getStringValue(raw: RawRecord, candidateKeys: string[]): string | undefined {
+  for (const key of candidateKeys) {
+    const value = raw[key]
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  const lowerCaseMap = new Map<string, unknown>()
+  for (const [key, value] of Object.entries(raw)) {
+    lowerCaseMap.set(key.toLowerCase(), value)
+  }
+
+  for (const key of candidateKeys) {
+    const value = lowerCaseMap.get(key.toLowerCase())
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim()
+    }
+  }
+
+  return undefined
+}
+
+function normalizeDeviceDetail(raw: unknown): GoIosDeviceDetails | null {
+  if (typeof raw === 'string' && raw.trim()) {
+    return {udid: raw.trim()}
+  }
+
+  if (!raw || typeof raw !== 'object') {
+    return null
+  }
+
+  const record = raw as RawRecord
+  const udid = getStringValue(record, ['udid', 'Udid', 'UDID'])
+  if (!udid) {
+    return null
+  }
+
+  return {
+    udid,
+    ProductName: getStringValue(record, ['ProductName', 'productName']),
+    ProductType: getStringValue(record, ['ProductType', 'productType']),
+    ProductVersion: getStringValue(record, ['ProductVersion', 'productVersion']),
+  }
+}
+
 function parseGoIosListOutput(output: string): GoIosListResponse {
+  let parsed: unknown
   try {
-    return JSON.parse(output) as GoIosListResponse
+    parsed = JSON.parse(output)
   } catch {
     return {}
   }
+
+  let rawList: unknown[] = []
+  if (Array.isArray(parsed)) {
+    rawList = parsed
+  } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as {deviceList?: unknown[]}).deviceList)) {
+    rawList = (parsed as {deviceList: unknown[]}).deviceList
+  }
+
+  const deviceList = rawList
+    .map((item) => normalizeDeviceDetail(item))
+    .filter((item): item is GoIosDeviceDetails => item !== null)
+
+  return {deviceList}
 }
 
 function toUnifiedIosDeviceInfo(device: GoIosDeviceDetails): UnifiedDeviceInfo {
@@ -54,7 +116,8 @@ export async function findIosDeviceByUdid(
   runner: CommandRunner = runCommand
 ): Promise<UnifiedDeviceInfo | null> {
   const list = await fetchGoIosDeviceList(runner)
-  const candidate = list.find((item) => item.udid === udid)
+  const targetUdid = udid.trim().toLowerCase()
+  const candidate = list.find((item) => item.udid.toLowerCase() === targetUdid)
   if (!candidate) {
     return null
   }

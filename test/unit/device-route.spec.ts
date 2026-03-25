@@ -43,7 +43,7 @@ describe('GET /soluna/device', () => {
         stdout: JSON.stringify({
           deviceList: [
             {
-              udid: 'ios-1',
+              Udid: 'ios-1',
               ProductName: 'iPhone 15',
               ProductType: 'iPhone15,4',
               ProductVersion: '17.5',

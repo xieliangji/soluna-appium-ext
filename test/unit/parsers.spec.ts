@@ -37,4 +37,35 @@ describe('device parsers', () => {
     expect(parsed.deviceList).to.have.length(1)
     expect(parsed.deviceList?.[0].udid).to.equal('ios-udid-1')
   })
+
+  it('parses ios list output with uppercase Udid field', () => {
+    const parsed = iosInternal.parseGoIosListOutput(
+      JSON.stringify({
+        deviceList: [
+          {
+            Udid: '00008140-001C184A3EB8401C',
+            ProductName: 'iPhone OS',
+            ProductType: 'iPhone17,2',
+            ProductVersion: '26.3.1',
+          },
+        ],
+      })
+    )
+
+    expect(parsed.deviceList).to.have.length(1)
+    expect(parsed.deviceList?.[0].udid).to.equal('00008140-001C184A3EB8401C')
+    expect(parsed.deviceList?.[0].ProductType).to.equal('iPhone17,2')
+  })
+
+  it('parses ios list output where deviceList is string array', () => {
+    const parsed = iosInternal.parseGoIosListOutput(
+      JSON.stringify({
+        deviceList: ['00008140-001C184A3EB8401C'],
+      })
+    )
+
+    expect(parsed.deviceList).to.have.length(1)
+    expect(parsed.deviceList?.[0].udid).to.equal('00008140-001C184A3EB8401C')
+    expect(parsed.deviceList?.[0].ProductName).to.equal(undefined)
+  })
 })
