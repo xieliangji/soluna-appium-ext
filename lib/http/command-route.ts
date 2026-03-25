@@ -8,6 +8,8 @@ interface CommandRouteDependencies {
   validateRequest?: typeof validateCommandRequest
 }
 
+const DEBUG_LOG_PREVIEW_MAX = 1000
+
 function buildCommandSummary(tool: string, args: string[], timeoutMs: number, maxOutputBytes: number): string {
   return `tool=${tool}, args=${JSON.stringify(args)}, timeoutMs=${timeoutMs}, maxOutputBytes=${maxOutputBytes}`
 }
@@ -20,6 +22,13 @@ function buildResultSummary(
   truncated: boolean
 ): string {
   return `command=${command}, exitCode=${String(exitCode)}, durationMs=${durationMs}, timedOut=${timedOut}, truncated=${truncated}`
+}
+
+function toPreview(value: string): string {
+  if (value.length <= DEBUG_LOG_PREVIEW_MAX) {
+    return value
+  }
+  return `${value.slice(0, DEBUG_LOG_PREVIEW_MAX)}\n...<truncated for debug log>`
 }
 
 export async function handleExecuteCommand(
@@ -57,10 +66,14 @@ export async function handleExecuteCommand(
       `Command execution finished: ${buildResultSummary(result.command, result.exitCode, result.durationMs, result.timedOut, result.truncated)}`
     )
     if (result.stdout) {
-      logger.debug(`Command stdout (${result.command}):\n${result.stdout}`)
+      logger.debug(
+        `Command stdout (${result.command}, ${result.stdout.length} chars):\n${toPreview(result.stdout)}`
+      )
     }
     if (result.stderr) {
-      logger.debug(`Command stderr (${result.command}):\n${result.stderr}`)
+      logger.debug(
+        `Command stderr (${result.command}, ${result.stderr.length} chars):\n${toPreview(result.stderr)}`
+      )
     }
     res.status(status).json({
       value: {

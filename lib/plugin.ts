@@ -5,6 +5,11 @@ import type {AppiumServer} from '@appium/types'
 import {runPreflightChecks} from './cli/preflight'
 import {handleGetDeviceInfo, handleListDevices} from './http/device-route'
 import {handleExecuteCommand} from './http/command-route'
+import {
+  handleCreateLogSession,
+  handleDeleteLogSession,
+  handleReadLogSession,
+} from './http/log-route'
 
 export class SolunaExtPlugin extends BasePlugin {
   // noinspection JSUnusedGlobalSymbols
@@ -25,6 +30,18 @@ export class SolunaExtPlugin extends BasePlugin {
 
     expressApp.post('/soluna/command', express.json(), async (req, res) => {
       await handleExecuteCommand(req, res)
+    })
+
+    expressApp.post('/soluna/logs/sessions', express.json(), async (req, res) => {
+      await handleCreateLogSession(req, res)
+    })
+
+    expressApp.get('/soluna/logs/sessions/:sessionId', async (req, res) => {
+      await handleReadLogSession(req, res)
+    })
+
+    expressApp.delete('/soluna/logs/sessions/:sessionId', async (req, res) => {
+      await handleDeleteLogSession(req, res)
     })
   }
 }

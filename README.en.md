@@ -4,6 +4,7 @@
 
 - Appium startup preflight checks for host CLI dependencies (`adb` and `go-ios`/`ios`)
 - A custom HTTP endpoint to query device info by `udid` with a unified Android/iOS response model
+- A unified log session API to collect Android/iOS logs for a target `udid` (disk-first with small memory cache)
 
 Preflight command discovery is cross-platform:
 
@@ -66,6 +67,11 @@ Response includes:
 - `truncated`: whether output was truncated
 - `stdout` / `stderr`: captured output
 
+Logging notes:
+
+- The plugin logs command summary metadata (args, duration, exit code)
+- Debug `stdout/stderr` logs are preview-truncated to avoid log pollution from huge output
+
 Logging behavior:
 
 - Request/result summaries are logged at Appium `info` level
@@ -76,6 +82,61 @@ For long-running commands that keep streaming output, this plugin uses controlle
 - captures output within `timeoutMs`
 - sends `SIGTERM` first, then `SIGKILL` if needed
 - returns captured output to avoid hanging HTTP requests
+
+### 4) Unified log session API (by UDID)
+
+The plugin exposes log session APIs:
+
+- `POST /soluna/logs/sessions`
+- `GET /soluna/logs/sessions/:sessionId?cursor=<n>&limit=<n>`
+- `DELETE /soluna/logs/sessions/:sessionId`
+
+#### Create session
+
+Example body:
+
+```json
+{
+  "udid": "abc123",
+  "maxBufferEntries": 1000,
+  "maxSessionBytes": 104857600,
+  "ttlMs": 600000
+}
+```
+
+Fields:
+
+- `udid`: target device UDID (required)
+- `maxBufferEntries`: in-memory ring buffer size (default 1000, range 100~10000)
+- `maxSessionBytes`: per-session disk file cap (default 100MB, range 1MB~500MB)
+- `ttlMs`: idle timeout for automatic cleanup (default 10m, range 1m~24h)
+
+The create response returns `sessionId`. Use this id + cursor to fetch logs incrementally.
+
+#### Read logs
+
+`GET /soluna/logs/sessions/:sessionId?cursor=0&limit=200`
+
+Important response fields:
+
+- `entries`: unified log entries for Android/iOS
+- `nextCursor`: cursor for next pull
+- `cursorAdjusted`: `true` when requested cursor is too old and was auto-adjusted
+
+#### Delete session
+
+`DELETE /soluna/logs/sessions/:sessionId`
+
+This stops the background log process and removes the session disk file.
+
+#### Storage strategy (to avoid memory blow-up)
+
+This feature uses a disk-first model with a small in-memory cache:
+
+- every log entry is persisted to a temporary JSONL file
+- only recent N entries are kept in memory for fast reads
+- when file size reaches cap, oldest logs are trimmed and `droppedCount` increases
+- idle sessions are cleaned by TTL to avoid long-term disk usage
 
 ## How to use this plugin when starting Appium
 
@@ -194,12 +255,72 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
   -d '{"tool":"adb","args":["devices"],"timeoutMs":5000}'
 ```
 
+### 6) Call log session APIs
+
+Create session:
+
+```bash
+curl -X POST "http://127.0.0.1:4723/soluna/logs/sessions" \
+  -H "Content-Type: application/json" \
+  -d '{"udid":"<YOUR_UDID>"}'
+```
+
+Incremental pull:
+
+```bash
+curl "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>?cursor=0&limit=200"
+```
+
+Delete session:
+
+```bash
+curl -X DELETE "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>"
+```
+
+### 7) Optional custom host/port
 ### 7) Optional custom host/port
 
 ```bash
 appium --address 0.0.0.0 --port 4725 --use-plugins=soluna-ext
 curl "http://127.0.0.1:4725/soluna/device?udid=<YOUR_UDID>"
 curl "http://127.0.0.1:4725/soluna/devices"
+```
+
+### 8) Python client (under `test`)
+
+A lightweight Python client is provided at `soluna_client.py` in the repository root (stdlib only, no third-party deps).
+
+Example:
+
+```python
+from soluna_client import SolunaClient
+
+client = SolunaClient(base_url='http://127.0.0.1:4723')
+
+# Device lookup
+device = client.get_device_info('abc123')
+# Or list all connected devices
+devices = client.list_devices()
+
+# Command execution
+cmd = client.execute_command('adb', ['devices'])
+
+# Log session APIs
+created = client.create_log_session('abc123')
+sid = created['session']['sessionId']
+batch = client.read_log_session(sid, cursor=0, limit=200)
+client.delete_log_session(sid)
+```
+
+It also supports context-managed auto cleanup:
+
+```python
+from soluna_client import SolunaClient
+
+client = SolunaClient()
+with client.log_session('abc123') as (sid, _):
+    logs = client.read_log_session(sid, cursor=0, limit=200)
+    print(logs['entries'])
 ```
 
 ## Development

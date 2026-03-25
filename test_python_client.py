@@ -6,6 +6,9 @@ from unittest.mock import patch, MagicMock
 
 from soluna_client import (
     DeviceInfo,
+    LogSessionCreateResult,
+    LogSessionDeleteResult,
+    LogSessionReadResult,
     SolunaAPIError,
     SolunaClient,
     SolunaClientError,
@@ -109,6 +112,29 @@ class SolunaClientTests(unittest.TestCase):
         self.assertEqual(result.devices[1].platform, 'ios')
 
     @patch('soluna_client.request.urlopen')
+    def test_get_device_info_alias(self, mock_urlopen):
+        mock_urlopen.return_value = _FakeResponse(
+            {
+                'value': {
+                    'exists': True,
+                    'device': {
+                        'platform': 'android',
+                        'udid': 'abc123',
+                        'name': 'Pixel 8',
+                        'model': 'Pixel 8',
+                        'osVersion': '14',
+                    },
+                }
+            }
+        )
+
+        with patch.object(self.client._opener, 'open', return_value=mock_urlopen.return_value):
+            result = self.client.get_device_info('abc123')
+        self.assertTrue(result.exists)
+        assert result.device is not None
+        self.assertEqual(result.device.udid, 'abc123')
+
+    @patch('soluna_client.request.urlopen')
     def test_execute_command_success(self, mock_urlopen):
         mock_urlopen.return_value = _FakeResponse(
             {
@@ -131,6 +157,139 @@ class SolunaClientTests(unittest.TestCase):
         self.assertTrue(result.ok)
         self.assertEqual(result.exit_code, 0)
         self.assertEqual(result.command, 'adb')
+
+    @patch('soluna_client.request.urlopen')
+    def test_create_log_session_success(self, mock_urlopen):
+        mock_urlopen.return_value = _FakeResponse(
+            {
+                'value': {
+                    'session': {
+                        'sessionId': 's-1',
+                        'udid': 'abc123',
+                        'platform': 'android',
+                        'status': 'running',
+                        'command': 'adb',
+                        'args': ['-s', 'abc123', 'logcat', '-v', 'threadtime'],
+                        'startedAt': '2026-03-25T07:00:00.000Z',
+                        'lastActivityAt': '2026-03-25T07:00:00.000Z',
+                        'ttlMs': 600000,
+                        'nextSeq': 0,
+                        'minSeq': 0,
+                        'droppedCount': 0,
+                        'maxBufferEntries': 1000,
+                        'maxSessionBytes': 104857600,
+                    }
+                }
+            }
+        )
+
+        with patch.object(self.client._opener, 'open', return_value=mock_urlopen.return_value):
+            result = self.client.create_log_session('abc123')
+
+        self.assertIsInstance(result, LogSessionCreateResult)
+        self.assertEqual(result.session.session_id, 's-1')
+        self.assertEqual(result.session.platform, 'android')
+
+    @patch('soluna_client.request.urlopen')
+    def test_read_log_session_success(self, mock_urlopen):
+        mock_urlopen.return_value = _FakeResponse(
+            {
+                'value': {
+                    'session': {
+                        'sessionId': 's-1',
+                        'udid': 'abc123',
+                        'platform': 'android',
+                        'status': 'running',
+                        'command': 'adb',
+                        'args': ['-s', 'abc123', 'logcat', '-v', 'threadtime'],
+                        'startedAt': '2026-03-25T07:00:00.000Z',
+                        'lastActivityAt': '2026-03-25T07:00:10.000Z',
+                        'ttlMs': 600000,
+                        'nextSeq': 2,
+                        'minSeq': 0,
+                        'droppedCount': 0,
+                        'maxBufferEntries': 1000,
+                        'maxSessionBytes': 104857600,
+                    },
+                    'cursor': 0,
+                    'nextCursor': 1,
+                    'cursorAdjusted': False,
+                    'entries': [
+                        {
+                            'seq': 0,
+                            'ts': '2026-03-25T07:00:01.000Z',
+                            'platform': 'android',
+                            'udid': 'abc123',
+                            'source': 'stdout',
+                            'message': 'hello',
+                            'raw': 'hello',
+                            'tag': 'Tag',
+                            'pid': 123,
+                        }
+                    ],
+                }
+            }
+        )
+
+        with patch.object(self.client._opener, 'open', return_value=mock_urlopen.return_value):
+            result = self.client.read_log_session('s-1', cursor=0, limit=100)
+
+        self.assertIsInstance(result, LogSessionReadResult)
+        self.assertEqual(result.next_cursor, 1)
+        self.assertEqual(len(result.entries), 1)
+        self.assertEqual(result.entries[0].message, 'hello')
+        self.assertEqual(result.entries[0].pid, 123)
+
+    @patch('soluna_client.request.urlopen')
+    def test_delete_log_session_success(self, mock_urlopen):
+        mock_urlopen.return_value = _FakeResponse(
+            {
+                'value': {
+                    'sessionId': 's-1',
+                    'removed': True,
+                }
+            }
+        )
+
+        with patch.object(self.client._opener, 'open', return_value=mock_urlopen.return_value):
+            result = self.client.delete_log_session('s-1')
+
+        self.assertIsInstance(result, LogSessionDeleteResult)
+        self.assertEqual(result.session_id, 's-1')
+        self.assertTrue(result.removed)
+
+    @patch('soluna_client.request.urlopen')
+    def test_log_session_context_auto_cleanup(self, mock_urlopen):
+        create_resp = _FakeResponse(
+            {
+                'value': {
+                    'session': {
+                        'sessionId': 's-ctx',
+                        'udid': 'abc123',
+                        'platform': 'android',
+                        'status': 'running',
+                        'command': 'adb',
+                        'args': ['-s', 'abc123', 'logcat', '-v', 'threadtime'],
+                        'startedAt': '2026-03-25T07:00:00.000Z',
+                        'lastActivityAt': '2026-03-25T07:00:00.000Z',
+                        'ttlMs': 600000,
+                        'nextSeq': 0,
+                        'minSeq': 0,
+                        'droppedCount': 0,
+                        'maxBufferEntries': 1000,
+                        'maxSessionBytes': 104857600,
+                    }
+                }
+            }
+        )
+        delete_resp = _FakeResponse({'value': {'sessionId': 's-ctx', 'removed': True}})
+
+        with patch.object(self.client._opener, 'open', side_effect=[create_resp, delete_resp]) as mocked_open:
+            with self.client.log_session('abc123') as (session_id, created):
+                self.assertEqual(session_id, 's-ctx')
+                self.assertEqual(created.session.udid, 'abc123')
+
+        self.assertEqual(mocked_open.call_count, 2)
 
     def test_http_error_with_api_payload_raises_api_error(self):
         payload = {'value': {'error': 'invalid_argument', 'message': 'bad request'}}
@@ -216,6 +375,18 @@ class SolunaClientTests(unittest.TestCase):
     def test_get_device_validates_udid(self):
         with self.assertRaises(ValueError):
             self.client.get_device('   ')
+
+    def test_create_log_session_validates_udid(self):
+        with self.assertRaises(ValueError):
+            self.client.create_log_session('   ')
+
+    def test_read_log_session_validates_session_id(self):
+        with self.assertRaises(ValueError):
+            self.client.read_log_session('   ')
+
+    def test_delete_log_session_validates_session_id(self):
+        with self.assertRaises(ValueError):
+            self.client.delete_log_session('   ')
 
 
 if __name__ == '__main__':

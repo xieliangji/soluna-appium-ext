@@ -23,6 +23,8 @@ module.exports = [
         Buffer: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         __dirname: 'readonly',
         NodeJS: 'readonly',
         describe: 'readonly',

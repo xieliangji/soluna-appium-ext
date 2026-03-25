@@ -64,7 +64,43 @@ describe('POST /soluna/command', () => {
     expect(response.status).to.equal(200)
     expect(records.some((entry) => entry.includes('Executing command request'))).to.equal(true)
     expect(records.some((entry) => entry.includes('Command execution finished'))).to.equal(true)
-    expect(records.some((entry) => entry.includes('Command stdout (adb)'))).to.equal(true)
+    expect(records.some((entry) => entry.includes('Command stdout (adb,'))).to.equal(true)
+  })
+
+  it('truncates huge stdout in debug logs', async () => {
+    const records: string[] = []
+    const testLogger: SolunaLogger = {
+      info: (...args: unknown[]) => records.push(`info:${args.join(' ')}`),
+      debug: (...args: unknown[]) => records.push(`debug:${args.join(' ')}`),
+      warn: (...args: unknown[]) => records.push(`warn:${args.join(' ')}`),
+      error: (...args: unknown[]) => records.push(`error:${args.join(' ')}`),
+    }
+
+    const loggingApp = express()
+    loggingApp.use(express.json())
+    loggingApp.post('/soluna/command', async (req, res) => {
+      const executeCommand = async (): Promise<CommandExecuteResult> => ({
+        command: 'adb',
+        args: ['devices'],
+        exitCode: 0,
+        timedOut: false,
+        truncated: false,
+        durationMs: 5,
+        stdout: 'x'.repeat(1500),
+        stderr: '',
+      })
+
+      await handleExecuteCommand(req, res, {logger: testLogger, executeCommand})
+    })
+
+    const response = await request(loggingApp)
+      .post('/soluna/command')
+      .send({tool: 'adb', args: ['devices']})
+
+    expect(response.status).to.equal(200)
+    const stdoutLog = records.find((entry) => entry.startsWith('debug:Command stdout'))
+    expect(stdoutLog).to.be.a('string')
+    expect(stdoutLog?.includes('...<truncated for debug log>')).to.equal(true)
   })
 
   it('logs validation failures as warn', async () => {

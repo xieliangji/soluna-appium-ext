@@ -4,6 +4,7 @@
 
 - 在 Appium 启动前检查宿主机依赖（`adb`、`go-ios`/`ios`）
 - 通过 HTTP 接口按 `udid` 查询设备，并以统一模型返回 Android/iOS 设备信息
+- 通过日志会话接口统一采集指定 `udid` 的 Android/iOS 日志（落盘 + 小内存缓存）
 
 预检中的命令发现已做跨平台兼容：
 
@@ -68,6 +69,11 @@ English documentation is available in [`README.en.md`](./README.en.md).
 - `truncated`：输出是否被截断
 - `stdout` / `stderr`：采集到的输出
 
+日志说明：
+
+- 接口会记录命令摘要日志（参数、耗时、退出码等）
+- 为避免日志被超长输出污染，调试日志中的 `stdout/stderr` 会做预览截断
+
 日志行为：
 
 - 请求与执行结果摘要输出到 Appium `info` 级别日志
@@ -78,6 +84,61 @@ English documentation is available in [`README.en.md`](./README.en.md).
 - 在 `timeoutMs` 窗口内持续采集输出
 - 到时先发 `SIGTERM`，必要时再升级为 `SIGKILL`
 - 返回当前已采集结果，避免接口阻塞
+
+### 4）统一日志会话接口（指定 UDID）
+
+插件暴露日志会话接口：
+
+- `POST /soluna/logs/sessions`
+- `GET /soluna/logs/sessions/:sessionId?cursor=<n>&limit=<n>`
+- `DELETE /soluna/logs/sessions/:sessionId`
+
+#### 创建会话
+
+请求体示例：
+
+```json
+{
+  "udid": "abc123",
+  "maxBufferEntries": 1000,
+  "maxSessionBytes": 104857600,
+  "ttlMs": 600000
+}
+```
+
+字段说明：
+
+- `udid`：目标设备 UDID（必填）
+- `maxBufferEntries`：内存环形缓存条数（默认 1000，范围 100~10000）
+- `maxSessionBytes`：单会话落盘文件上限（默认 100MB，范围 1MB~500MB）
+- `ttlMs`：会话空闲超时自动清理（默认 10 分钟，范围 1 分钟~24 小时）
+
+返回 `sessionId` 后，调用方可按 cursor 增量拉取日志。
+
+#### 读取日志
+
+`GET /soluna/logs/sessions/:sessionId?cursor=0&limit=200`
+
+返回字段重点：
+
+- `entries`：统一格式日志数组（Android/iOS 抽象一致）
+- `nextCursor`：下一次拉取起点
+- `cursorAdjusted`：若传入 cursor 已过期（旧日志被淘汰），会自动修正并标记为 `true`
+
+#### 结束会话
+
+`DELETE /soluna/logs/sessions/:sessionId`
+
+会停止日志子进程并删除该会话的落盘文件。
+
+#### 存储策略（避免内存爆）
+
+日志采用“落盘为主 + 小内存缓存”：
+
+- 每条日志写入临时 JSONL 文件
+- 同时保留最近 N 条在内存中，保证热读取性能
+- 文件超上限后会裁剪最旧日志，并在会话元数据中累计 `droppedCount`
+- 会话到期（TTL）自动清理，避免长期占用磁盘
 
 成功响应示例：
 
@@ -233,6 +294,29 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
   -d '{"tool":"adb","args":["devices"],"timeoutMs":5000}'
 ```
 
+### 6）调用日志会话接口
+
+创建会话：
+
+```bash
+curl -X POST "http://127.0.0.1:4723/soluna/logs/sessions" \
+  -H "Content-Type: application/json" \
+  -d '{"udid":"<YOUR_UDID>"}'
+```
+
+增量拉取：
+
+```bash
+curl "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>?cursor=0&limit=200"
+```
+
+结束会话：
+
+```bash
+curl -X DELETE "http://127.0.0.1:4723/soluna/logs/sessions/<SESSION_ID>"
+```
+
+### 7）可选：自定义 Appium 地址与端口
 ### 7）可选：自定义 Appium 地址与端口
 
 如果你不是用默认 `127.0.0.1:4723`，请同步修改请求地址：
@@ -241,6 +325,43 @@ curl -X POST "http://127.0.0.1:4723/soluna/command" \
 appium --address 0.0.0.0 --port 4725 --use-plugins=soluna-ext
 curl "http://127.0.0.1:4725/soluna/device?udid=<YOUR_UDID>"
 curl "http://127.0.0.1:4725/soluna/devices"
+```
+
+### 8）Python client（test 包）
+
+仓库内提供了一个轻量 Python client：`soluna_client.py`（仓库根目录，仅标准库，无第三方依赖）。
+
+示例：
+
+```python
+from soluna_client import SolunaClient
+
+client = SolunaClient(base_url='http://127.0.0.1:4723')
+
+# 设备查询
+device = client.get_device_info('abc123')
+# 或获取当前所有连接设备
+devices = client.list_devices()
+
+# 命令执行
+cmd = client.execute_command('adb', ['devices'])
+
+# 日志会话
+created = client.create_log_session('abc123')
+sid = created['session']['sessionId']
+batch = client.read_log_session(sid, cursor=0, limit=200)
+client.delete_log_session(sid)
+```
+
+也支持上下文自动清理：
+
+```python
+from soluna_client import SolunaClient
+
+client = SolunaClient()
+with client.log_session('abc123') as (sid, _):
+    logs = client.read_log_session(sid, cursor=0, limit=200)
+    print(logs['entries'])
 ```
 
 ## 开发说明
